@@ -1,0 +1,28 @@
+dist: focal
+language: rust
+cache: cargo
+rust:
+  - 1.53.0
+
+services:
+  - docker
+
+env:
+  global:
+    - DEBUG="true"
+    
+install:
+  - make rust-toolchain-setup
+  - configure_docker
+  - docker --version
+  - docker info
+
+script:
+  - make ci-test
+
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: make ci-release
+    on:
+      all_branches: true

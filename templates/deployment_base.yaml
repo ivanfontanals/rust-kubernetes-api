@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "[[NAME]]"
+  labels:
+    app: "[[NAME]]"
+    app.kubernetes.io/instance: "{{NAME}}"
+    app.kubernetes.io/part-of: "notebooks"
+    app.kubernetes.io/version: "[[VERSION]]"
+  annotations:
+    notebook-name: "[[NAME]]"
+    notebook-ingress: "[[INGRESS_HOST]]"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "[[NAME]]"
+  template:
+    metadata:
+      labels:
+        app: "[[NAME]]"
+        app.kubernetes.io/instance: "[[NAME]]"
+        app.kubernetes.io/part-of: "notebooks"
+        app.kubernetes.io/version: "[[VERSION]]"
+      annotations:
+        notebook-name: "[[NAME]]"
+        notebook-ingress: "[[INGRESS_HOST]]"
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+        iam.amazonaws.com/role: "role-arn"
+    spec:
+      initContainers:
+      - name: "pip-config"
+        image: "notebooks-pip-config-image"
+        workingDir: /root/.pip
+        volumeMounts:
+          - mountPath: /root/.pip
+            name: pip-config
+        envFrom:
+          - secretRef:
+              name: artifactory-credentials
+        command: [ "bash", "-c", "-e" ]
+        args:
+          - |
+            if [[ -z "${ARTIFACTORY_USER}" ]] || [[ -z "${ARTIFACTORY_PWD}" ]]; then
+            echo "Error: ARTIFACTORY_USER and ARTIFACTORY_PWD must be defined as environment variables"; exit 1; fi
+            echo "Creating .pip file..."
+            cat <<EOF > /root/.pip/pip.conf
+            [global]
+            index-url=https://$ARTIFACTORY_USER:$ARTIFACTORY_PWD@artifactory.mpi-internal.com/artifactory/api/pypi/pypi-virtual/simple
+            EOF
+      containers:
+      - name: notebook
+        image: notebook-image
+        ports:
+        - containerPort: 8888
+        command: ["start-notebook.sh"]
+        args: ["--NotebookApp.token=''"]
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: "[[AWS_DEFAULT_REGION]]"
+          - name: JUPYTER_ENABLE_LAB
+            value: "yes"
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: SPARK_UI_URL
+            value: "[[SPARK_UI_URL]]"
+        volumeMounts:
+          - mountPath: /home/jovyan/work
+            name: work
+          - mountPath: /home/jovyan/.config/git
+            name: git-config
+          - mountPath: /home/jovyan/.pip
+            name: pip-config
+        resources:
+          requests:
+            cpu: "[[CPU]]"
+            memory: "[[MEMORY]]"
+            ephemeral-storage: "[[EPHEMERAL]]"
+          limits:
+            cpu: "[[CPU]]"
+            memory: "[[MEMORY]]"
+            ephemeral-storage: "[[EPHEMERAL]]"
+      volumes:
+        - name: work
+          emptyDir: {}
+        - name: git-config
+          emptyDir: {}
+        - name: pip-config
+          emptyDir: {}

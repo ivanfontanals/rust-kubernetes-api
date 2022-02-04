@@ -1,0 +1,24 @@
+apiVersion: cluster.unicron.mpi-internal.com/v1alpha1
+kind: NodeGroup
+metadata:
+  name: {{NAME}}
+spec:
+  enabled: true
+  availabilityZoneNumber: 1
+  size:
+    min: {{MIN_SIZE}}
+    max: {{MAX_SIZE}}
+    target: {{TARGET_SIZE}}
+  instanceTypes:
+    default: {{DEFAULT_INSTANCE_TYPE}}
+    {{#if ALTERNATE_INSTANCE_TYPE}}
+    alternates: [{{ALTERNATE_INSTANCE_TYPE}}]
+    {{/if}}
+    
+  lifecycle: ondemand
+  spotAllocationStrategy: capacity-optimized
+  storage:
+    ephemeral: {{EPHEMERAL_STORAGE}}
+  kubernetes:
+    labels: {}
+    taints: []
